@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>이음샘과 책 읽는 교실</title>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@300;400;700&family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<style>
+:root {
+  --primary: #5B9A8B;
+  --primary-light: #8FC1B5;
+  --primary-dark: #3D7A6B;
+  --accent: #E8A87C;
+  --accent-light: #F0C4A8;
+  --success: #7CB342;
+  --warning: #FFB74D;
+  --bg: #F4F9F7;
+  --text: #2C3E3A;
+  --text-light: #5F7A74;
+  --text-muted: #9BB5AD;
+  --border: #D4E4DF;
+  --star: #F4B942;
+  --shadow: 0 2px 16px rgba(59,100,87,0.07);
+  --shadow-lg: 0 8px 40px rgba(59,100,87,0.12);
+  --radius: 18px;
+  --radius-sm: 12px;
+  --teacher: #7E6BAD;
+  --teacher-light: #A594CC;
+  --teacher-bg: #F3F0FA;
+  --card-bg: rgba(255,255,255,0.82);
+  --leaf: #A8D5BA;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse at 10% 20%, rgba(168,213,186,0.25) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 80%, rgba(180,210,235,0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(200,180,220,0.1) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+/* ===== 로딩 ===== */
+.loading-overlay {
+  position:fixed; inset:0; background:linear-gradient(160deg, #EDF5F0 0%, #F0F4F8 50%, #F3EFF8 100%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:9999;
+}
+.loading-overlay.hidden { display:none; }
+.loading-spinner {
+  width:44px; height:44px; border:3px solid var(--border);
+  border-top-color:var(--primary); border-radius:50%;
+  animation: spin 1s ease-in-out infinite; margin-bottom:16px;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-text { font-family:'Gowun Batang',serif; font-size:15px; color:var(--text-light); letter-spacing:0.5px; }
+
+/* ===== 로그인 ===== */
+.login-screen {
+  min-height:100vh; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; padding:20px;
+  background:linear-gradient(160deg, #E8F3EC 0%, #EAF0F6 40%, #F0EBF5 100%);
+  position:relative; overflow:hidden;
+}
+.login-screen::before {
+  content:''; position:absolute; top:-10%; left:-10%; width:120%; height:60%;
+  background:radial-gradient(ellipse, rgba(168,213,186,0.3) 0%, transparent 70%);
+  pointer-events:none;
+}
+.login-screen::after {
+  content:''; position:absolute; bottom:-5%; right:-5%; width:80%; height:40%;
+  background:radial-gradient(ellipse, rgba(180,200,230,0.25) 0%, transparent 70%);
+  pointer-events:none;
+}
+.login-logo {
+  font-family:'Gowun Batang',serif; font-size:34px; font-weight:700;
+  color:var(--primary-dark); margin-bottom:8px; text-align:center; line-height:1.4;
+  position:relative; z-index:1;
+}
+.login-sub { font-family:'Gowun Batang',serif; font-size:14px; color:var(--text-light); margin-bottom:36px; letter-spacing:1px; position:relative; z-index:1; }
+.login-card {
+  background:var(--card-bg); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(168,213,186,0.3);
+  border-radius:24px; padding:36px 28px; width:100%; max-width:360px;
+  box-shadow:var(--shadow-lg); position:relative; z-index:1;
+}
+.login-card h3 { font-family:'Gowun Batang',serif; font-size:17px; font-weight:700; margin-bottom:24px; text-align:center; color:var(--primary-dark); }
+.input-group { margin-bottom:16px; }
+.input-group label { display:block; font-size:13px; font-weight:500; color:var(--text-light); margin-bottom:6px; }
+.input-group select, .input-group input {
+  width:100%; padding:14px 16px; border:1.5px solid var(--border);
+  border-radius:var(--radius-sm); font-size:16px;
+  font-family:'Noto Sans KR',sans-serif; transition:all 0.25s; background:rgba(255,255,255,0.7);
+}
+.input-group select:focus, .input-group input:focus { outline:none; border-color:var(--primary); background:white; box-shadow:0 0 0 3px rgba(91,154,139,0.1); }
+
+.mode-toggle { display:flex; gap:8px; margin-bottom:24px; }
+.mode-btn {
+  flex:1; padding:12px; border:1.5px solid var(--border); border-radius:var(--radius-sm);
+  background:rgba(255,255,255,0.5); font-size:14px; font-weight:600; cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif; transition:all 0.25s; text-align:center;
+}
+.mode-btn.active-student { border-color:var(--primary); background:rgba(91,154,139,0.08); color:var(--primary-dark); }
+.mode-btn.active-teacher { border-color:var(--teacher); background:rgba(126,107,173,0.08); color:var(--teacher); }
+.student-fields, .teacher-fields { display:none; }
+.student-fields.show, .teacher-fields.show { display:block; }
+
+.btn {
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; padding:14px; border:none; border-radius:var(--radius-sm);
+  font-size:15px; font-weight:600; font-family:'Noto Sans KR',sans-serif;
+  cursor:pointer; transition:all 0.25s; letter-spacing:0.3px;
+}
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-primary { background:var(--primary); color:white; }
+.btn-primary:hover:not(:disabled) { background:var(--primary-dark); transform:translateY(-1px); box-shadow:0 4px 12px rgba(91,154,139,0.25); }
+.btn-accent { background:var(--accent); color:white; }
+.btn-accent:hover:not(:disabled) { background:#D4956A; }
+.btn-teacher { background:var(--teacher); color:white; }
+.btn-teacher:hover:not(:disabled) { background:#6B5A96; }
+.btn-outline { background:transparent; border:1.5px solid var(--border); color:var(--text-light); }
+.btn-outline:hover { border-color:var(--primary); color:var(--primary); background:rgba(91,154,139,0.04); }
+.btn-sm { padding:10px 16px; font-size:14px; width:auto; }
+
+/* ===== 앱 ===== */
+.app-container { display:none; min-height:100vh; padding-bottom:80px; }
+.app-header {
+  background:var(--card-bg); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  padding:14px 20px; display:flex; align-items:center;
+  justify-content:space-between; border-bottom:1px solid rgba(168,213,186,0.2);
+  position:sticky; top:0; z-index:100;
+}
+.app-header-left { display:flex; align-items:center; gap:10px; }
+.app-title { font-family:'Gowun Batang',serif; font-size:20px; font-weight:700; color:var(--primary-dark); }
+.user-badge { background:var(--primary); color:white; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:500; }
+.user-badge.teacher-badge { background:var(--teacher); }
+.logout-btn { background:none; border:none; font-size:13px; color:var(--text-muted); cursor:pointer; padding:6px 10px; }
+
+/* ===== 탭 ===== */
+.tab-nav {
+  position:fixed; bottom:0; left:0; right:0;
+  background:var(--card-bg); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  display:flex; border-top:1px solid rgba(168,213,186,0.2);
+  z-index:100;
+}
+.tab-item {
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  padding:10px 4px 8px; border:none; background:none; cursor:pointer;
+  color:var(--text-muted); transition:color 0.2s; font-family:'Noto Sans KR',sans-serif;
+}
+.tab-item.active { color:var(--primary-dark); }
+.tab-item.teacher-tab.active { color:var(--teacher); }
+.tab-item .tab-icon { font-size:22px; margin-bottom:2px; }
+.tab-item .tab-label { font-size:11px; font-weight:500; }
+.tab-content { display:none; padding:20px; }
+.tab-content.active { display:block; }
+
+/* ===== 스캔 ===== */
+.scan-area {
+  background:var(--card-bg); backdrop-filter:blur(8px);
+  border:1px solid rgba(168,213,186,0.2);
+  border-radius:var(--radius); padding:24px; text-align:center;
+  box-shadow:var(--shadow); margin-bottom:20px;
+}
+.scan-area h2 { font-family:'Gowun Batang',serif; font-size:19px; font-weight:700; margin-bottom:8px; color:var(--primary-dark); }
+.scan-area p { font-size:14px; color:var(--text-light); margin-bottom:20px; }
+#reader { width:100%; max-width:400px; margin:0 auto 16px; border-radius:var(--radius-sm); overflow:hidden; }
+.manual-input { margin-top:16px; display:flex; gap:8px; }
+.manual-input input { flex:1; padding:12px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:15px; font-family:'Noto Sans KR',sans-serif; background:rgba(255,255,255,0.7); }
+.manual-input input:focus { outline:none; border-color:var(--primary); background:white; }
+.scanner-notice {
+  background:rgba(232,168,124,0.1); border:1px solid rgba(232,168,124,0.25);
+  border-radius:var(--radius-sm); padding:14px; margin-bottom:16px;
+  font-size:13px; color:#9A6B4A; line-height:1.5;
+}
+
+/* ===== 책 카드 ===== */
+.book-result { display:none; background:var(--card-bg); border:1px solid rgba(168,213,186,0.2); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); margin-bottom:20px; }
+.book-info { display:flex; gap:16px; margin-bottom:20px; }
+.book-cover { width:100px; min-height:140px; border-radius:10px; object-fit:cover; box-shadow:2px 4px 16px rgba(59,100,87,0.15); background:#EDF5F0; }
+.book-cover-placeholder { width:100px; min-height:140px; border-radius:10px; background:linear-gradient(135deg,var(--leaf),var(--primary)); display:flex; align-items:center; justify-content:center; font-size:36px; color:white; box-shadow:2px 4px 16px rgba(59,100,87,0.15); }
+.book-details { flex:1; }
+.book-details h3 { font-size:17px; font-weight:700; margin-bottom:6px; line-height:1.4; }
+.book-details .author { font-size:14px; color:var(--text-light); margin-bottom:4px; }
+.book-details .publisher { font-size:13px; color:var(--text-muted); margin-bottom:4px; }
+.category-select-grid { display:flex; flex-wrap:wrap; gap:6px; }
+.cat-chip {
+  padding:7px 12px; border:1.5px solid var(--border); border-radius:20px;
+  background:rgba(255,255,255,0.6); font-size:13px; cursor:pointer; font-family:'Noto Sans KR',sans-serif;
+  transition:all 0.2s; font-weight:500; display:flex; align-items:center; gap:4px;
+}
+.cat-chip.selected { border-color:var(--primary); background:rgba(91,154,139,0.1); color:var(--primary-dark); }
+.cat-chip:hover { border-color:var(--primary-light); }
+.category-tag { display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:500; }
+.rating-section { margin-bottom:16px; }
+.rating-section label { display:block; font-size:14px; font-weight:500; margin-bottom:8px; }
+.stars { display:flex; gap:6px; }
+.star-btn { background:none; border:none; font-size:32px; cursor:pointer; color:var(--border); transition:all 0.15s; padding:2px; }
+.star-btn.active { color:var(--star); transform:scale(1.1); }
+.star-btn:hover { transform:scale(1.15); }
+.review-input { width:100%; padding:14px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:15px; font-family:'Noto Sans KR',sans-serif; resize:none; margin-bottom:16px; background:rgba(255,255,255,0.7); }
+.review-input:focus { outline:none; border-color:var(--primary); background:white; }
+.review-input::placeholder { color:var(--text-muted); }
+
+/* ===== 책장 ===== */
+.month-selector { display:flex; align-items:center; gap:12px; margin-bottom:20px; justify-content:center; }
+.month-selector button { background:var(--card-bg); border:1.5px solid var(--border); border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; transition:all 0.2s; }
+.month-selector button:hover { border-color:var(--primary); color:var(--primary); }
+.month-selector .current-month { font-family:'Gowun Batang',serif; font-size:18px; font-weight:700; color:var(--primary-dark); min-width:120px; text-align:center; }
+.bookshelf { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:24px; }
+.shelf-book {
+  background:var(--card-bg); border:1px solid rgba(168,213,186,0.15);
+  border-radius:var(--radius-sm); padding:6px; box-shadow:var(--shadow);
+  text-align:center; cursor:pointer; transition:all 0.25s;
+}
+.shelf-book:hover { transform:translateY(-3px); box-shadow:var(--shadow-lg); }
+.shelf-book img { width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:6px; margin-bottom:4px; }
+.shelf-book .shelf-title { font-size:10px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.shelf-book .shelf-stars { font-size:9px; color:var(--star); margin-top:2px; }
+.empty-shelf { grid-column:1/-1; text-align:center; padding:60px 20px; color:var(--text-muted); }
+.empty-shelf .empty-icon { font-size:48px; margin-bottom:12px; }
+
+/* ===== 통계 ===== */
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px; }
+.stat-card {
+  background:var(--card-bg); border:1px solid rgba(168,213,186,0.15);
+  border-radius:var(--radius); padding:18px; text-align:center; box-shadow:var(--shadow);
+}
+.stat-card.wide { grid-column:1/-1; }
+.stat-number { font-size:30px; font-weight:900; color:var(--primary); font-family:'Gaegu',cursive; }
+.stat-number.accent { color:var(--accent); }
+.stat-number.teacher-color { color:var(--teacher); }
+.stat-label { font-size:13px; color:var(--text-light); margin-top:4px; }
+
+/* ===== 우리반 ===== */
+.section-title { font-family:'Gowun Batang',serif; font-size:18px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; color:var(--primary-dark); }
+.popular-books { display:flex; gap:14px; overflow-x:auto; padding-bottom:12px; margin-bottom:24px; -webkit-overflow-scrolling:touch; }
+.popular-book { flex:0 0 120px; background:var(--card-bg); border:1px solid rgba(168,213,186,0.15); border-radius:var(--radius-sm); padding:10px; box-shadow:var(--shadow); text-align:center; }
+.popular-book img { width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:8px; margin-bottom:6px; }
+.popular-book .pop-title { font-size:12px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:4px; }
+.popular-book .pop-count { font-size:11px; color:var(--accent); font-weight:700; }
+.reader-rank { display:flex; align-items:center; gap:14px; background:var(--card-bg); border:1px solid rgba(168,213,186,0.15); border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow); }
+.rank-badge { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:900; flex-shrink:0; }
+.rank-1 { background:rgba(244,185,66,0.15); color:#C49520; } .rank-2 { background:rgba(155,181,173,0.2); color:#6B8A82; } .rank-3 { background:rgba(232,168,124,0.15); color:#B08060; }
+.reader-name { flex:1; font-weight:500; font-size:15px; }
+.reader-count { font-size:20px; font-weight:900; color:var(--primary); font-family:'Gaegu',cursive; }
+.reader-count span { font-size:13px; font-weight:400; color:var(--text-light); font-family:'Noto Sans KR',sans-serif; }
+
+/* ===== 추천 ===== */
+.recommend-form { background:var(--card-bg); border:1px solid rgba(168,213,186,0.15); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); margin-bottom:24px; }
+.recommend-form h3 { font-family:'Gowun Batang',serif; font-size:16px; font-weight:700; margin-bottom:16px; }
+.recommend-card { background:var(--card-bg); border:1px solid rgba(168,213,186,0.15); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:var(--shadow); }
+.recommend-header { display:flex; gap:12px; margin-bottom:12px; }
+.recommend-cover { width:70px; height:95px; border-radius:8px; object-fit:cover; box-shadow:1px 2px 8px rgba(59,100,87,0.1); }
+.recommend-info { flex:1; }
+.recommend-info h4 { font-size:15px; font-weight:700; margin-bottom:3px; }
+.recommend-info .rec-author { font-size:13px; color:var(--text-light); }
+.recommend-info .rec-by { font-size:12px; color:var(--primary); font-weight:500; margin-top:6px; }
+.recommend-text { font-size:14px; color:var(--text); line-height:1.6; padding:12px; background:rgba(168,213,186,0.08); border-radius:10px; border-left:3px solid var(--leaf); }
+
+/* ===== 선생님 ===== */
+.teacher-section { background:var(--card-bg); border:1px solid rgba(126,107,173,0.12); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); margin-bottom:20px; }
+.teacher-section h3 { font-family:'Gowun Batang',serif; font-size:17px; font-weight:700; margin-bottom:16px; color:var(--teacher); display:flex; align-items:center; gap:8px; }
+.student-table { width:100%; border-collapse:collapse; font-size:14px; }
+.student-table th { background:var(--teacher-bg); color:var(--teacher); padding:12px 10px; text-align:left; font-weight:600; border-bottom:2px solid var(--teacher-light); position:sticky; top:0; }
+.student-table td { padding:10px; border-bottom:1px solid var(--border); }
+.student-table tr:hover td { background:rgba(126,107,173,0.03); }
+.student-table .num-cell { text-align:center; font-weight:600; color:var(--primary); }
+.table-wrapper { overflow-x:auto; margin-bottom:16px; border-radius:var(--radius-sm); border:1px solid var(--border); }
+.student-detail-card { background:var(--card-bg); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); margin-bottom:16px; border-left:4px solid var(--teacher); }
+.student-detail-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.student-detail-header h4 { font-size:17px; font-weight:700; }
+.student-detail-header .close-detail { background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-muted); padding:4px; }
+.category-chart { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.category-bar-item { flex:1; min-width:calc(50% - 8px); }
+.category-bar-label { font-size:12px; font-weight:500; color:var(--text-light); margin-bottom:4px; display:flex; justify-content:space-between; }
+.category-bar-bg { height:20px; background:rgba(168,213,186,0.15); border-radius:10px; overflow:hidden; }
+.category-bar-fill { height:100%; border-radius:10px; transition:width 0.5s ease; min-width:4px; }
+.month-filter { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.month-chip { padding:8px 14px; border:1.5px solid var(--border); border-radius:20px; background:rgba(255,255,255,0.6); font-size:13px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; transition:all 0.2s; font-weight:500; }
+.month-chip.active { border-color:var(--teacher); background:var(--teacher-bg); color:var(--teacher); }
+.class-category-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+.class-cat-card { padding:14px; border-radius:var(--radius-sm); text-align:center; transition:transform 0.2s; }
+.class-cat-card:hover { transform:scale(1.02); }
+.class-cat-card .cat-emoji { font-size:28px; margin-bottom:4px; }
+.class-cat-card .cat-name { font-size:13px; font-weight:600; }
+.class-cat-card .cat-count { font-size:20px; font-weight:900; font-family:'Gaegu',cursive; }
+
+/* ===== 모달 ===== */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(44,62,58,0.5); backdrop-filter:blur(4px); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+.modal-overlay.show { display:flex; }
+.modal-content { background:white; border-radius:var(--radius); padding:24px; max-width:400px; width:100%; max-height:80vh; overflow-y:auto; position:relative; border:1px solid rgba(168,213,186,0.2); }
+.modal-close { position:absolute; top:12px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-muted); padding:4px; }
+.modal-stars { color:var(--star); margin:8px 0; font-size:18px; }
+.modal-review { padding:12px; background:rgba(168,213,186,0.08); border-radius:10px; font-size:14px; line-height:1.6; }
+.toast { position:fixed; bottom:100px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--primary-dark); color:white; padding:14px 24px; border-radius:14px; font-size:14px; font-weight:500; opacity:0; transition:all 0.3s; z-index:2000; white-space:nowrap; box-shadow:0 4px 20px rgba(59,100,87,0.2); }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.delete-btn { background:none; border:1px solid rgba(220,150,150,0.4); color:#C0544F; padding:8px 16px; border-radius:10px; font-size:13px; cursor:pointer; margin-top:12px; font-family:'Noto Sans KR',sans-serif; }
+.delete-btn:hover { background:rgba(220,150,150,0.06); }
+.export-btn { display:inline-flex; align-items:center; gap:6px; padding:10px 18px; background:var(--primary); color:white; border:none; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
+.export-btn:hover { background:var(--primary-dark); }
+
+/* ===== 반응형 - 작은 핸드폰 ===== */
+@media (max-width:380px) {
+  .login-logo { font-size:28px; }
+  .login-card { padding:28px 20px; }
+  .bookshelf { grid-template-columns:repeat(3,1fr); gap:6px; }
+  .shelf-book { padding:4px; }
+  .shelf-book .shelf-title { font-size:9px; }
+  .stats-grid { gap:8px; }
+  .stat-number { font-size:26px; }
+  .scan-area { padding:16px; }
+  .scan-area h2 { font-size:17px; }
+  .tab-content { padding:12px; }
+  .popular-book { flex:0 0 100px; padding:8px; }
+  .app-title { font-size:17px; }
+  .btn { padding:12px; font-size:14px; }
+  .month-selector .current-month { font-size:16px; }
+}
+
+/* ===== 반응형 - 일반 핸드폰 ===== */
+@media (min-width:381px) and (max-width:599px) {
+  .bookshelf { grid-template-columns:repeat(4,1fr); gap:7px; }
+  .login-logo { font-size:30px; }
+  .tab-content { padding:16px; }
+}
+
+/* ===== 반응형 - 태블릿/패드 ===== */
+@media (min-width:600px) {
+  .bookshelf { grid-template-columns:repeat(6,1fr); }
+  .stats-grid { grid-template-columns:repeat(4,1fr); }
+  .class-category-grid { grid-template-columns:repeat(3,1fr); }
+  .tab-content { padding:24px; max-width:700px; margin:0 auto; }
+  .login-card { max-width:400px; }
+  .scan-area { max-width:600px; margin:0 auto 20px; }
+  .popular-book { flex:0 0 140px; }
+}
+
+/* ===== 반응형 - 큰 패드/PC ===== */
+@media (min-width:1024px) {
+  .tab-content { max-width:800px; }
+  .bookshelf { grid-template-columns:repeat(8,1fr); }
+  .stats-grid { grid-template-columns:repeat(4,1fr); gap:16px; }
+  .class-category-grid { grid-template-columns:repeat(4,1fr); }
+  .teacher-section { padding:28px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 로딩 -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">책 읽는 교실을 준비하고 있어요...</div>
+</div>
+
+<!-- 로그인 -->
+<div class="login-screen" id="loginScreen" style="display:none">
+  <div class="login-logo">🌿 이음샘과<br>책 읽는 교실</div>
+  <div class="login-sub">숲속 도서관에서 함께 읽기</div>
+  <div class="login-card">
+    <h3>로그인</h3>
+    <div class="mode-toggle">
+      <button class="mode-btn active-student" id="modeStudent" onclick="setMode('student')">🎒 학생</button>
+      <button class="mode-btn" id="modeTeacher" onclick="setMode('teacher')">🍎 선생님</button>
+    </div>
+    <div class="student-fields show" id="studentFields">
+      <div class="input-group"><label>번호</label><select id="studentNumber"><option value="">번호를 선택하세요</option></select></div>
+      <div class="input-group"><label>이름</label><input type="text" id="studentName" placeholder="이름을 입력하세요" autocomplete="off"><div id="recentUsers" style="display:none;margin-top:8px"></div></div>
+      <button class="btn btn-primary" onclick="loginStudent()" style="margin-top:8px">📖 시작하기</button>
+    </div>
+    <div class="teacher-fields" id="teacherFields">
+      <div class="input-group"><label>비밀번호</label><input type="password" id="teacherPw" placeholder="선생님 비밀번호"></div>
+      <button class="btn btn-teacher" onclick="loginTeacher()" style="margin-top:8px">🍎 선생님 모드 입장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 학생 앱 -->
+<div class="app-container" id="studentApp">
+  <div class="app-header">
+    <div class="app-header-left"><span class="app-title">🌿 책 읽는 교실</span><span class="user-badge" id="studentBadge"></span></div>
+    <button class="logout-btn" onclick="logout()">로그아웃</button>
+  </div>
+  <div class="tab-content active" id="tabScan">
+    <div class="scan-area">
+      <h2>📷 책 바코드 스캔</h2>
+      <p>책 뒤의 바코드를 카메라에 비춰주세요</p>
+      <div id="reader"></div>
+      <div id="reader-temp" style="display:none"></div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-primary" id="scanBtn" onclick="toggleScanner()" style="flex:1">📷 카메라로 스캔하기</button>
+        <button class="btn btn-outline" onclick="scanFromPhoto()" style="flex:1">📸 사진으로 스캔</button>
+      </div>
+      <div class="scanner-notice" style="margin-top:16px">💡 카메라가 안 될 때는 아래에 ISBN 번호를 직접 입력해도 돼요!<br>(책 뒷면 바코드 아래 숫자 978로 시작하는 13자리)<br>⚠️ 카메라 스캔은 <b>https://</b> 주소에서만 작동해요.</div>
+      <div class="manual-input"><input type="text" id="isbnInput" placeholder="ISBN 번호 또는 책 제목 검색"><button class="btn btn-accent btn-sm" onclick="searchBook()">검색</button></div>
+    </div>
+    <div class="book-result" id="bookResult">
+      <div class="book-info">
+        <img class="book-cover" id="resultCover" src="" alt="">
+        <div class="book-details"><h3 id="resultTitle"></h3><div class="author" id="resultAuthor"></div><div class="publisher" id="resultPublisher"></div><div id="resultCategory"></div></div>
+      </div>
+      <div class="rating-section"><label>📂 분야를 선택해주세요</label>
+        <div class="category-select-grid" id="categorySelect"></div>
+      </div>
+      <div class="rating-section"><label>⭐ 별점을 매겨주세요</label>
+        <div class="stars" id="starRating">
+          <button class="star-btn" onclick="setRating(1)">★</button><button class="star-btn" onclick="setRating(2)">★</button><button class="star-btn" onclick="setRating(3)">★</button><button class="star-btn" onclick="setRating(4)">★</button><button class="star-btn" onclick="setRating(5)">★</button>
+        </div>
+      </div>
+      <textarea class="review-input" id="reviewInput" rows="2" placeholder="한줄 추천글을 써주세요 (생략 가능)"></textarea>
+      <button class="btn btn-primary" id="saveBookBtn" onclick="saveBook()">📚 내 책장에 저장하기</button>
+    </div>
+  </div>
+  <div class="tab-content" id="tabShelf">
+    <div class="month-selector"><button onclick="changeMonth(-1)">◀</button><div class="current-month" id="currentMonth"></div><button onclick="changeMonth(1)">▶</button></div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-number" id="myMonthCount">0</div><div class="stat-label">이번달 읽은 책</div></div>
+      <div class="stat-card"><div class="stat-number accent" id="myTotalCount">0</div><div class="stat-label">전체 읽은 책</div></div>
+    </div>
+    <div class="bookshelf" id="myBookshelf"></div>
+  </div>
+  <div class="tab-content" id="tabClass">
+    <div class="stats-grid" style="margin-bottom:24px">
+      <div class="stat-card"><div class="stat-number" id="classMonthCount">0</div><div class="stat-label">이번달 우리반</div></div>
+      <div class="stat-card"><div class="stat-number accent" id="classTotalCount">0</div><div class="stat-label">3월부터 누적</div></div>
+    </div>
+    <div class="section-title">🔥 우리반 인기 책</div>
+    <div class="popular-books" id="popularBooks"></div>
+    <div class="section-title">👑 독서왕 TOP 3</div>
+    <div class="top-readers" id="topReaders"></div>
+  </div>
+  <div class="tab-content" id="tabRecommend">
+    <div class="recommend-form">
+      <h3>📝 이달의 책 추천하기</h3>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">친구들에게 추천하고 싶은 책을 등록해주세요!</p>
+      <div class="manual-input" style="margin-top:0;margin-bottom:12px"><input type="text" id="recIsbnInput" placeholder="ISBN 또는 책 제목으로 검색"><button class="btn btn-accent btn-sm" onclick="searchForRecommend()">검색</button></div>
+      <div id="recBookResult" style="display:none"><div class="book-info" id="recBookInfo"></div><textarea class="review-input" id="recReviewInput" rows="2" placeholder="이 책을 추천하는 이유를 써주세요!"></textarea><button class="btn btn-primary" onclick="saveRecommendation()">💝 추천하기</button></div>
+    </div>
+    <div class="section-title">💝 이달의 추천 책</div>
+    <div class="recommend-list" id="recommendList"></div>
+  </div>
+  <div class="tab-nav" id="studentNav">
+    <button class="tab-item active" data-tab="tabScan" onclick="switchTab('tabScan')"><span class="tab-icon">📷</span><span class="tab-label">스캔</span></button>
+    <button class="tab-item" data-tab="tabShelf" onclick="switchTab('tabShelf')"><span class="tab-icon">📚</span><span class="tab-label">내 책장</span></button>
+    <button class="tab-item" data-tab="tabClass" onclick="switchTab('tabClass')"><span class="tab-icon">🏫</span><span class="tab-label">우리반</span></button>
+    <button class="tab-item" data-tab="tabRecommend" onclick="switchTab('tabRecommend')"><span class="tab-icon">💝</span><span class="tab-label">추천</span></button>
+  </div>
+</div>
+
+<!-- 선생님 앱 -->
+<div class="app-container" id="teacherApp">
+  <div class="app-header" style="border-bottom:3px solid var(--teacher)">
+    <div class="app-header-left"><span class="app-title" style="color:var(--teacher)">🍎 선생님 대시보드</span><span class="user-badge teacher-badge">선생님</span></div>
+    <button class="logout-btn" onclick="logout()">로그아웃</button>
+  </div>
+  <div class="tab-content active" id="tabTeacherOverview">
+    <div class="month-filter" id="teacherMonthFilter"></div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-number teacher-color" id="tClassMonth">0</div><div class="stat-label">이번달 전체</div></div>
+      <div class="stat-card"><div class="stat-number accent" id="tClassTotal">0</div><div class="stat-label">누적 합계</div></div>
+      <div class="stat-card"><div class="stat-number" id="tAvgBooks">0</div><div class="stat-label">1인 평균</div></div>
+      <div class="stat-card"><div class="stat-number accent" id="tActiveStudents">0</div><div class="stat-label">참여 학생</div></div>
+    </div>
+    <div class="teacher-section">
+      <h3>📊 학생별 독서 현황 <button class="export-btn" onclick="exportCSV()" style="margin-left:auto;font-size:12px;padding:6px 12px">📥 CSV</button></h3>
+      <div class="table-wrapper"><table class="student-table"><thead><tr><th>번호</th><th>이름</th><th>이번달</th><th>누적</th><th>평균별점</th><th>상세</th></tr></thead><tbody id="studentTableBody"></tbody></table></div>
+    </div>
+    <div id="studentDetailArea"></div>
+    <div class="teacher-section"><h3>📚 우리반 독서 분야 분석</h3><div class="class-category-grid" id="classCategoryGrid"></div></div>
+    <div id="categoryBookList"></div>
+  </div>
+  <div class="tab-content" id="tabTeacherAnalysis">
+    <div class="teacher-section"><h3>🔍 학생별 상세 분석</h3><div class="input-group"><label>학생 선택</label><select id="analysisStudentSelect" onchange="renderStudentAnalysis()"><option value="">학생을 선택하세요</option></select></div></div>
+    <div id="analysisResult"></div>
+  </div>
+  <div class="tab-content" id="tabTeacherData">
+    <div class="teacher-section">
+      <h3>⚙️ 데이터 관리</h3>
+      <p style="font-size:14px;color:var(--text-light);margin-bottom:16px">선생님 비밀번호를 변경하거나 데이터를 관리할 수 있어요.</p>
+      <div class="input-group"><label>새 비밀번호</label><input type="password" id="newPw" placeholder="새 비밀번호 입력"></div>
+      <button class="btn btn-teacher btn-sm" onclick="changePassword()" style="margin-bottom:24px;width:auto">비밀번호 변경</button>
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
+      <h3 style="font-size:15px;font-weight:700;color:#e74c3c;margin-bottom:12px">⚠️ 위험 구역</h3>
+      <button class="delete-btn" onclick="resetAllData()">🗑 전체 데이터 초기화</button>
+    </div>
+  </div>
+  <div class="tab-content" id="tabTeacherRecommend">
+    <div class="recommend-form">
+      <h3>📝 선생님의 이달의 책 추천</h3>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">아이들에게 추천하고 싶은 책을 등록해주세요!</p>
+      <div class="manual-input" style="margin-top:0;margin-bottom:12px"><input type="text" id="teacherRecIsbnInput" placeholder="ISBN 또는 책 제목으로 검색"><button class="btn btn-accent btn-sm" onclick="teacherSearchForRecommend()">검색</button></div>
+      <div id="teacherRecBookResult" style="display:none"><div class="book-info" id="teacherRecBookInfo"></div><textarea class="review-input" id="teacherRecReviewInput" rows="2" placeholder="이 책을 추천하는 이유를 써주세요!"></textarea><button class="btn btn-teacher" onclick="teacherSaveRecommendation()">💝 추천하기</button></div>
+    </div>
+    <div class="section-title">💝 이달의 추천 책 (학생 + 선생님)</div>
+    <div class="recommend-list" id="teacherRecommendList"></div>
+  </div>
+  <div class="tab-nav">
+    <button class="tab-item teacher-tab active" data-tab="tabTeacherOverview" onclick="switchTeacherTab('tabTeacherOverview')"><span class="tab-icon">📊</span><span class="tab-label">전체현황</span></button>
+    <button class="tab-item teacher-tab" data-tab="tabTeacherRecommend" onclick="switchTeacherTab('tabTeacherRecommend')"><span class="tab-icon">💝</span><span class="tab-label">추천</span></button>
+    <button class="tab-item teacher-tab" data-tab="tabTeacherAnalysis" onclick="switchTeacherTab('tabTeacherAnalysis')"><span class="tab-icon">🔍</span><span class="tab-label">학생분석</span></button>
+    <button class="tab-item teacher-tab" data-tab="tabTeacherData" onclick="switchTeacherTab('tabTeacherData')"><span class="tab-icon">⚙️</span><span class="tab-label">설정</span></button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bookModal"><div class="modal-content"><button class="modal-close" onclick="closeModal()">✕</button><div id="modalBody"></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== Firebase 설정 =====
+const firebaseConfig = {
+  apiKey: "AIzaSyAq-TqxTtW9kF2RxRF5evxcYgWtOV14l0g",
+  authDomain: "reading-classroom-contest.firebaseapp.com",
+  projectId: "reading-classroom-contest",
+  storageBucket: "reading-classroom-contest.firebasestorage.app",
+  messagingSenderId: "1036348796781",
+  appId: "1:1036348796781:web:4146b251db21b2a6b2f464"
+};
+
+let db = null;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+} catch(e) {
+  console.error('Firebase 초기화 실패:', e);
+}
+
+// ===== 설정 =====
+const KAKAO_API_KEY = 'a03c39316fdb108bc42039126d8e776b';
+const CLASS_SIZE = 25;
+const DEFAULT_TEACHER_PW = '1234';
+
+// ===== 카테고리 =====
+const CATEGORY_MAP = {
+  '동화/소설':{emoji:'📖',color:'#4A90D9'},
+  '사회/역사/철학':{emoji:'🌍',color:'#795548'},
+  '과학/수학/컴퓨터':{emoji:'🔬',color:'#4CAF50'},
+  '문화/예술/인물':{emoji:'🎨',color:'#FF8C42'},
+  '학습만화':{emoji:'💬',color:'#E91E63'},
+  '시/에세이':{emoji:'✍️',color:'#9C27B0'},
+  '기타':{emoji:'📚',color:'#B2BEC3'}
+};
+
+function guessCategory(title, author, publisher, desc) {
+  const all = (title+' '+author+' '+publisher+' '+desc).toLowerCase();
+  if (/학습만화|만화로\s*배우|서바이벌|why|코믹/.test(all)) return '학습만화';
+  if (/만화|웹툰/.test(all) && /과학|역사|수학|한국사/.test(all)) return '학습만화';
+  if (/과학|수학|실험|우주|공룡|로봇|인공지능|화학|물리|코딩|컴퓨터|프로그래밍|지구|날씨|생물/.test(all)) return '과학/수학/컴퓨터';
+  if (/역사|전쟁|조선|삼국|고려|한국사|세계사|사회|경제|정치|환경|철학|민주|헌법|법|시사|독립/.test(all)) return '사회/역사/철학';
+  if (/위인|음악|미술|그림|예술|영화|문화|디자인|건축|사진|인물|전기|명화/.test(all)) return '문화/예술/인물';
+  if (/시집|에세이|산문|시인|동시/.test(all)) return '시/에세이';
+  if (/동화|소설|추리|판타지|모험|이야기|창작|전래|그림책|옛이야기|어린이|아동|초등/.test(all)) return '동화/소설';
+  return '기타';
+}
+
+// ===== 상태 =====
+let currentUser = null;
+let isTeacher = false;
+let selectedRating = 0;
+let selectedCategory = '';
+let currentBook = null;
+let viewMonth = new Date().getMonth();
+let viewYear = new Date().getFullYear();
+let teacherViewMonth = -1;
+let scannerRunning = false;
+let allBooks = []; // 캐시
+let allRecs = [];
+let allStudents = {};
+
+// ===== Firestore 데이터 로드 =====
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+}
+
+async function loadAllData() {
+  if (!db) return;
+  try {
+    const booksSnap = await withTimeout(db.collection('books').orderBy('date','desc').get(), 8000);
+    allBooks = booksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const recsSnap = await withTimeout(db.collection('recommendations').orderBy('date','desc').get(), 5000);
+    allRecs = recsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const studSnap = await withTimeout(db.collection('students').get(), 5000);
+    allStudents = {};
+    studSnap.docs.forEach(d => { allStudents[d.id] = d.data().name; });
+  } catch(e) {
+    console.error('데이터 로드 실패:', e);
+    throw e;
+  }
+}
+
+async function addBook(bookData) {
+  if (db) {
+    const docRef = await db.collection('books').add(bookData);
+    bookData.id = docRef.id;
+  } else {
+    bookData.id = 'local_' + Date.now();
+  }
+  allBooks.unshift(bookData);
+  return bookData.id;
+}
+
+async function removeBook(bookId) {
+  if (db) await db.collection('books').doc(bookId).delete();
+  allBooks = allBooks.filter(b => b.id !== bookId);
+}
+
+async function addRecommendation(recData) {
+  if (db) {
+    const docRef = await db.collection('recommendations').add(recData);
+    recData.id = docRef.id;
+  } else {
+    recData.id = 'local_' + Date.now();
+  }
+  allRecs.unshift(recData);
+}
+
+async function registerStudent(number, name) {
+  if (db) await db.collection('students').doc(String(number)).set({ name });
+  allStudents[number] = name;
+}
+
+async function getTeacherPw() {
+  if (!db) return DEFAULT_TEACHER_PW;
+  try {
+    const doc = await withTimeout(db.collection('settings').doc('teacherPw').get(), 3000);
+    return doc.exists ? doc.data().pw : DEFAULT_TEACHER_PW;
+  } catch(e) { return DEFAULT_TEACHER_PW; }
+}
+
+async function setTeacherPw(pw) {
+  if (db) await db.collection('settings').doc('teacherPw').set({ pw });
+}
+
+// ===== 초기화 =====
+async function init() {
+  const select = document.getElementById('studentNumber');
+  for (let i = 1; i <= CLASS_SIZE; i++) {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = i + '번';
+    select.appendChild(opt);
+  }
+
+  try {
+    await withTimeout(loadAllData(), 6000);
+  } catch(e) {
+    console.error('Firebase 연결 실패:', e);
+  }
+  // 무조건 로그인 화면 표시
+  document.getElementById('loadingOverlay').classList.add('hidden');
+  document.getElementById('loginScreen').style.display = 'flex';
+  renderRecentUsers();
+}
+
+// 혹시 init 자체가 실패해도 5초 후 강제로 로그인 표시
+setTimeout(function() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (!overlay.classList.contains('hidden')) {
+    overlay.classList.add('hidden');
+    document.getElementById('loginScreen').style.display = 'flex';
+    console.warn('강제 로딩 해제');
+  }
+}, 5000);
+
+// ===== 로그인 =====
+function setMode(mode) {
+  document.getElementById('modeStudent').className = 'mode-btn' + (mode==='student'?' active-student':'');
+  document.getElementById('modeTeacher').className = 'mode-btn' + (mode==='teacher'?' active-teacher':'');
+  document.getElementById('studentFields').className = 'student-fields' + (mode==='student'?' show':'');
+  document.getElementById('teacherFields').className = 'teacher-fields' + (mode==='teacher'?' show':'');
+}
+
+// 최근 로그인 기록 관리
+function getRecentUsers() {
+  try {
+    const data = localStorage.getItem('readingClassroom_recentUsers');
+    return data ? JSON.parse(data) : [];
+  } catch(e) { return []; }
+}
+function saveRecentUser(number, name) {
+  try {
+    let users = getRecentUsers();
+    // 중복 제거
+    users = users.filter(u => !(u.number == number && u.name === name));
+    // 맨 앞에 추가
+    users.unshift({ number, name });
+    // 최대 5명까지만 저장
+    if (users.length > 5) users = users.slice(0, 5);
+    localStorage.setItem('readingClassroom_recentUsers', JSON.stringify(users));
+  } catch(e) {}
+}
+function renderRecentUsers() {
+  const container = document.getElementById('recentUsers');
+  const users = getRecentUsers();
+  if (users.length === 0) { container.style.display = 'none'; return; }
+  container.style.display = 'block';
+  container.innerHTML = '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px">최근 로그인</div>';
+  users.forEach(u => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.style.cssText = 'display:inline-block;padding:6px 14px;margin:0 4px 4px 0;border:1.5px solid var(--primary-light);border-radius:20px;background:rgba(91,154,139,0.06);font-size:13px;font-weight:500;color:var(--primary-dark);cursor:pointer;font-family:inherit;transition:all 0.2s;';
+    chip.textContent = u.number + '번 ' + u.name;
+    chip.onclick = function() {
+      document.getElementById('studentNumber').value = u.number;
+      document.getElementById('studentName').value = u.name;
+    };
+    container.appendChild(chip);
+  });
+}
+
+async function loginStudent() {
+  const number = document.getElementById('studentNumber').value;
+  const name = document.getElementById('studentName').value.trim();
+  if (!number) { showToast('번호를 선택해주세요'); return; }
+  if (!name) { showToast('이름을 입력해주세요'); return; }
+  currentUser = { number: parseInt(number), name }; isTeacher = false;
+  // 기기에 로그인 기록 저장
+  saveRecentUser(number, name);
+  try {
+    await registerStudent(number, name);
+  } catch(e) {
+    console.error('학생 등록 오류:', e);
+  }
+  showStudentApp();
+}
+
+async function loginTeacher() {
+  const pw = document.getElementById('teacherPw').value;
+  const correctPw = await getTeacherPw();
+  if (pw !== correctPw) { showToast('비밀번호가 틀렸어요'); return; }
+  isTeacher = true; currentUser = { name:'선생님' };
+  showTeacherApp();
+}
+
+function showStudentApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('studentApp').style.display = 'block';
+  document.getElementById('teacherApp').style.display = 'none';
+  document.getElementById('studentBadge').textContent = `${currentUser.number}번 ${currentUser.name}`;
+  updateMonth(); renderMyShelf(); renderClassTab(); renderRecommendations();
+}
+
+function showTeacherApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('studentApp').style.display = 'none';
+  document.getElementById('teacherApp').style.display = 'block';
+  initTeacherMonthFilter(); renderTeacherOverview(); populateAnalysisSelect();
+}
+
+function logout() {
+  currentUser = null; isTeacher = false; stopScanner();
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('studentApp').style.display = 'none';
+  document.getElementById('teacherApp').style.display = 'none';
+}
+
+// ===== 탭 =====
+function switchTab(tabId) {
+  document.querySelectorAll('#studentApp .tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#studentNav .tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.querySelector(`#studentNav [data-tab="${tabId}"]`).classList.add('active');
+  if (tabId==='tabShelf') renderMyShelf();
+  if (tabId==='tabClass') { loadAllData().then(()=>renderClassTab()); }
+  if (tabId==='tabRecommend') { loadAllData().then(()=>renderRecommendations()); }
+  if (tabId!=='tabScan') stopScanner();
+}
+function switchTeacherTab(tabId) {
+  document.querySelectorAll('#teacherApp .tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#teacherApp .tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.querySelector(`#teacherApp [data-tab="${tabId}"]`).classList.add('active');
+  if (tabId==='tabTeacherOverview') { loadAllData().then(()=>renderTeacherOverview()); }
+  if (tabId==='tabTeacherAnalysis') populateAnalysisSelect();
+  if (tabId==='tabTeacherRecommend') { loadAllData().then(()=>renderTeacherRecommendations()); }
+}
+
+// ===== 선생님 추천 기능 =====
+async function teacherSearchForRecommend() {
+  const q=document.getElementById('teacherRecIsbnInput').value.trim();
+  if(!q){showToast('검색어를 입력해주세요');return;}
+  const book=await kakaoSearchFull(q);
+  if(book) {
+    currentBook=book; const ci=CATEGORY_MAP[book.category]||CATEGORY_MAP['기타'];
+    document.getElementById('teacherRecBookInfo').innerHTML=`${book.thumbnail?`<img class="book-cover" src="${book.thumbnail}">`:`<div class="book-cover-placeholder">📖</div>`}<div class="book-details"><h3>${book.title}</h3><div class="author">${book.author||''}</div><div class="publisher">${book.publisher||''}</div><span class="category-tag" style="background:${ci.color}15;color:${ci.color}">${ci.emoji} ${book.category}</span></div>`;
+    document.getElementById('teacherRecBookResult').style.display='block'; showToast('✅ 책을 찾았어요!');
+  } else showToast('책을 찾을 수 없어요 😢');
+}
+async function teacherSaveRecommendation() {
+  if(!currentBook) return;
+  const review=document.getElementById('teacherRecReviewInput').value.trim();
+  const now=new Date();
+  await addRecommendation({...currentBook,review,studentNumber:'🍎',studentName:'선생님',date:now.toISOString(),month:now.getMonth(),year:now.getFullYear()});
+  currentBook=null; document.getElementById('teacherRecIsbnInput').value=''; document.getElementById('teacherRecReviewInput').value='';
+  document.getElementById('teacherRecBookResult').style.display='none';
+  showToast('💝 추천 등록 완료!'); renderTeacherRecommendations();
+}
+function renderTeacherRecommendations() {
+  const now=new Date();
+  const recs=allRecs.filter(r=>r.month===now.getMonth()&&r.year===now.getFullYear());
+  const el=document.getElementById('teacherRecommendList');
+  el.innerHTML=recs.length===0?`<div style="text-align:center;padding:40px 20px;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:12px">💝</div><p>아직 추천된 책이 없어요</p></div>`
+    :recs.map(r=>`<div class="recommend-card"><div class="recommend-header">${r.thumbnail?`<img class="recommend-cover" src="${r.thumbnail}">`:`<div style="width:70px;height:95px;background:linear-gradient(135deg,#6BB5FF,#4A90D9);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;color:white;flex-shrink:0">📖</div>`}<div class="recommend-info"><h4>${r.title}</h4><div class="rec-author">${r.author||''}</div><div class="rec-by">${r.studentNumber}번 ${r.studentName}의 추천</div></div></div>${r.review?`<div class="recommend-text">"${r.review}"</div>`:''}</div>`).join('');
+}
+
+// ===== 바코드 (QuaggaJS - 높은 인식률) =====
+let scannerLibLoaded = false, scannerLibLoading = false;
+function loadScannerLib() {
+  return new Promise((res,rej) => {
+    if (scannerLibLoaded||typeof Quagga!=='undefined') { scannerLibLoaded=true; res(); return; }
+    if (scannerLibLoading) { const c=setInterval(()=>{if(scannerLibLoaded){clearInterval(c);res();}},200); setTimeout(()=>{clearInterval(c);rej();},10000); return; }
+    scannerLibLoading=true;
+    const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js';
+    s.onload=()=>{scannerLibLoaded=true;scannerLibLoading=false;res();}; s.onerror=()=>{scannerLibLoading=false;rej();}; document.head.appendChild(s);
+  });
+}
+async function toggleScanner() { if(scannerRunning){stopScanner();return;} try{await loadScannerLib();startScanner();}catch(e){showToast('📷 카메라를 불러올 수 없어요');} }
+
+function startScanner() {
+  const btn=document.getElementById('scanBtn');
+  const readerEl=document.getElementById('reader');
+  readerEl.style.width='100%';
+  readerEl.style.maxWidth='500px';
+  readerEl.style.margin='0 auto 16px';
+  readerEl.style.overflow='hidden';
+  readerEl.style.borderRadius='12px';
+  readerEl.style.position='relative';
+  readerEl.innerHTML='';
+
+  Quagga.init({
+    inputStream: {
+      name: "Live",
+      type: "LiveStream",
+      target: readerEl,
+      constraints: {
+        facingMode: "environment",
+        width: { min: 1280, ideal: 1920 },
+        height: { min: 720, ideal: 1080 },
+        aspectRatio: { min: 1, max: 2 }
+      },
+      area: { top: "15%", right: "5%", left: "5%", bottom: "15%" }
+    },
+    locator: {
+      patchSize: "medium",
+      halfSample: true
+    },
+    numOfWorkers: navigator.hardwareConcurrency ? Math.min(navigator.hardwareConcurrency, 4) : 2,
+    frequency: 15,
+    decoder: {
+      readers: [
+        "ean_reader",
+        "ean_8_reader",
+        "upc_reader",
+        "upc_e_reader"
+      ],
+      multiple: false
+    },
+    locate: true
+  }, function(err) {
+    if (err) {
+      console.error('Quagga init error:', err);
+      showToast('카메라를 사용할 수 없어요. HTTPS 환경이 필요해요.');
+      return;
+    }
+    Quagga.start();
+    scannerRunning = true;
+    btn.textContent = '⏹ 스캔 중지';
+    btn.className = 'btn btn-accent';
+
+    // 비디오 스타일 조정
+    const video = readerEl.querySelector('video');
+    if(video) { video.style.width='100%'; video.style.borderRadius='12px'; }
+    const canvas = readerEl.querySelector('canvas');
+    if(canvas) { canvas.style.display='none'; }
+  });
+
+  // 인식 결과 필터링 (오인식 방지)
+  let lastCodes = [];
+  Quagga.onDetected(function(result) {
+    const code = result.codeResult.code;
+    if (!code) return;
+    const cleaned = code.replace(/[^0-9X]/gi, '');
+
+    // ISBN 유효성 기본 체크 (10자리 이상, 978/979로 시작하면 더 좋음)
+    if (cleaned.length < 10) return;
+
+    // 연속 2회 같은 코드 인식 시에만 확정 (오인식 방지)
+    lastCodes.push(cleaned);
+    if (lastCodes.length > 5) lastCodes.shift();
+
+    const matchCount = lastCodes.filter(c => c === cleaned).length;
+    if (matchCount >= 2) {
+      lastCodes = [];
+      stopScanner();
+      document.getElementById('isbnInput').value = cleaned;
+      if(navigator.vibrate) navigator.vibrate(200);
+      searchBook();
+    }
+  });
+}
+
+// 사진으로 바코드 스캔 (카메라 실시간이 안 될 때 대안)
+async function scanFromPhoto() {
+  try { await loadScannerLib(); } catch(e) { showToast('라이브러리를 불러올 수 없어요'); return; }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    showToast('🔍 사진에서 바코드 찾는 중...');
+
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      Quagga.decodeSingle({
+        decoder: {
+          readers: ["ean_reader","ean_8_reader","upc_reader","upc_e_reader"]
+        },
+        locate: true,
+        src: ev.target.result
+      }, function(result) {
+        if(result && result.codeResult) {
+          const cleaned = result.codeResult.code.replace(/[^0-9X]/gi, '');
+          if(cleaned.length >= 10) {
+            document.getElementById('isbnInput').value = cleaned;
+            if(navigator.vibrate) navigator.vibrate(200);
+            searchBook();
+            return;
+          }
+        }
+        showToast('바코드를 인식하지 못했어요. 다시 찍어주세요!');
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+function stopScanner() {
+  const btn=document.getElementById('scanBtn');
+  if(scannerRunning) {
+    try { Quagga.stop(); } catch(e) {}
+    scannerRunning=false;
+    btn.textContent='📷 카메라로 스캔하기';
+    btn.className='btn btn-primary';
+    const readerEl=document.getElementById('reader');
+    readerEl.innerHTML='';
+  }
+}
+
+// ===== 카카오 검색 =====
+async function kakaoSearchFull(query) {
+  const isISBN=/^\d{10,13}$/.test(query.replace(/-/g,''));
+  showToast('🔍 책 검색 중...');
+  try {
+    const clean=query.replace(/-/g,'');
+    let url=isISBN?`https://dapi.kakao.com/v3/search/book?query=${clean}&target=isbn`:`https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(query)}&size=1`;
+    let res=await fetch(url,{headers:{'Authorization':`KakaoAK ${KAKAO_API_KEY}`}});
+    let data=await res.json();
+    if((!data.documents||!data.documents.length)&&isISBN) {
+      res=await fetch(`https://dapi.kakao.com/v3/search/book?query=${clean}`,{headers:{'Authorization':`KakaoAK ${KAKAO_API_KEY}`}});
+      data=await res.json();
+    }
+    if(data.documents&&data.documents.length>0) {
+      const b=data.documents[0];
+      return { title:b.title, author:(b.authors||[]).join(', '), publisher:b.publisher, thumbnail:b.thumbnail, isbn:b.isbn, description:b.contents, category:guessCategory(b.title,(b.authors||[]).join(', '),b.publisher,b.contents) };
+    }
+    return null;
+  } catch(e) { console.error(e); return null; }
+}
+
+async function searchBook() {
+  const q=document.getElementById('isbnInput').value.trim();
+  if(!q){showToast('검색어를 입력해주세요');return;}
+  const book=await kakaoSearchFull(q);
+  if(book) showBookResult(book); else showToast('책을 찾을 수 없어요 😢');
+}
+
+function showBookResult(book) {
+  currentBook=book; selectedRating=0; selectedCategory=book.category||'';
+  document.getElementById('resultTitle').textContent=book.title;
+  document.getElementById('resultAuthor').textContent=book.author||'저자 미상';
+  document.getElementById('resultPublisher').textContent=book.publisher||'';
+  const ci=CATEGORY_MAP[book.category]||CATEGORY_MAP['기타'];
+  document.getElementById('resultCategory').innerHTML=`<span class="category-tag" style="background:${ci.color}15;color:${ci.color}">${ci.emoji} ${book.category} (자동추정)</span>`;
+  const img=document.getElementById('resultCover'); img.src=book.thumbnail||''; img.style.display=book.thumbnail?'block':'none';
+  document.querySelectorAll('#starRating .star-btn').forEach(s=>s.classList.remove('active'));
+  document.getElementById('reviewInput').value='';
+  // 카테고리 선택 렌더링
+  const catGrid=document.getElementById('categorySelect');
+  catGrid.innerHTML=Object.entries(CATEGORY_MAP).map(([name,info])=>`<button class="cat-chip${selectedCategory===name?' selected':''}" onclick="selectCategory('${name}')">${info.emoji} ${name}</button>`).join('');
+  document.getElementById('bookResult').style.display='block';
+  document.getElementById('bookResult').scrollIntoView({behavior:'smooth',block:'center'});
+  showToast('✅ 책을 찾았어요!');
+}
+
+function selectCategory(cat) {
+  selectedCategory=cat;
+  document.querySelectorAll('#categorySelect .cat-chip').forEach(el=>{
+    el.classList.toggle('selected', el.textContent.includes(cat));
+  });
+}
+
+function setRating(r) { selectedRating=r; document.querySelectorAll('#starRating .star-btn').forEach((s,i)=>s.classList.toggle('active',i<r)); }
+
+async function saveBook() {
+  if(!currentBook) return;
+  if(selectedRating===0){showToast('별점을 선택해주세요 ⭐');return;}
+  if(!selectedCategory){showToast('분야를 선택해주세요 📂');return;}
+  const btn=document.getElementById('saveBookBtn'); btn.disabled=true; btn.textContent='저장 중...';
+  try {
+    const review=document.getElementById('reviewInput').value.trim();
+    const now=new Date();
+    await addBook({
+      title:currentBook.title, author:currentBook.author, publisher:currentBook.publisher,
+      thumbnail:currentBook.thumbnail, isbn:currentBook.isbn, category:selectedCategory,
+      rating:selectedRating, review, studentNumber:currentUser.number, studentName:currentUser.name,
+      date:now.toISOString(), month:now.getMonth(), year:now.getFullYear()
+    });
+    currentBook=null; selectedRating=0;
+    document.getElementById('bookResult').style.display='none';
+    document.getElementById('isbnInput').value='';
+    showToast('📚 책장에 저장했어요!');
+    setTimeout(()=>switchTab('tabShelf'),800);
+  } catch(e) { showToast('저장에 실패했어요 😢'); console.error(e); }
+  finally { btn.disabled=false; btn.textContent='📚 내 책장에 저장하기'; }
+}
+
+// ===== 월 =====
+function updateMonth() {
+  const n=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('currentMonth').textContent=`${viewYear}년 ${n[viewMonth]}`;
+}
+function changeMonth(d) { viewMonth+=d; if(viewMonth>11){viewMonth=0;viewYear++;} if(viewMonth<0){viewMonth=11;viewYear--;} updateMonth(); renderMyShelf(); }
+
+// ===== 내 책장 =====
+function renderMyShelf() {
+  const my=allBooks.filter(b=>b.studentNumber===currentUser.number);
+  const month=my.filter(b=>b.month===viewMonth&&b.year===viewYear);
+  document.getElementById('myMonthCount').textContent=month.length;
+  document.getElementById('myTotalCount').textContent=my.length;
+  const shelf=document.getElementById('myBookshelf');
+  if(!month.length) { shelf.innerHTML=`<div class="empty-shelf"><div class="empty-icon">📖</div><p>이 달에 읽은 책이 없어요<br>스캔 탭에서 책을 등록해보세요!</p></div>`; return; }
+  shelf.innerHTML=month.map(b=>`<div class="shelf-book" onclick="showBookDetail('${b.id}')">
+    ${b.thumbnail?`<img src="${b.thumbnail}" onerror="this.style.display='none'">`:`<div style="width:100%;aspect-ratio:3/4;background:linear-gradient(135deg,#6BB5FF,#4A90D9);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;color:white;margin-bottom:6px">📖</div>`}
+    <div class="shelf-title">${b.title}</div><div class="shelf-stars">${'★'.repeat(b.rating)}${'☆'.repeat(5-b.rating)}</div></div>`).join('');
+}
+
+// ===== 모달 =====
+function showBookDetail(id) {
+  const book=allBooks.find(b=>b.id===id); if(!book) return;
+  const isMine=!isTeacher&&book.studentNumber===currentUser.number;
+  const ci=CATEGORY_MAP[book.category]||CATEGORY_MAP['기타'];
+  document.getElementById('modalBody').innerHTML=`
+    <div style="display:flex;gap:16px;margin-bottom:16px">
+      ${book.thumbnail?`<img src="${book.thumbnail}" style="width:90px;border-radius:8px;box-shadow:2px 4px 12px rgba(0,0,0,0.15)">`:`<div style="width:90px;height:126px;background:linear-gradient(135deg,#6BB5FF,#4A90D9);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;color:white">📖</div>`}
+      <div><h3 style="font-size:17px;font-weight:700;margin-bottom:4px">${book.title}</h3><div style="font-size:14px;color:var(--text-light)">${book.author||''}</div><div style="font-size:13px;color:var(--text-muted)">${book.publisher||''}</div>
+      ${book.category?`<span class="category-tag" style="background:${ci.color}15;color:${ci.color};margin-top:4px;display:inline-block">${ci.emoji} ${book.category}</span>`:''}<div class="modal-stars">${'★'.repeat(book.rating)}${'☆'.repeat(5-book.rating)}</div></div></div>
+    ${book.review?`<div class="modal-review">"${book.review}"</div>`:''}
+    <div style="font-size:12px;color:var(--text-muted);margin-top:12px;text-align:right">${new Date(book.date).toLocaleDateString('ko-KR')} · ${book.studentName}</div>
+    ${isMine?`<button class="delete-btn" onclick="deleteBook('${book.id}')">🗑 삭제하기</button>`:''}`;
+  document.getElementById('bookModal').classList.add('show');
+}
+function closeModal() { document.getElementById('bookModal').classList.remove('show'); }
+async function deleteBook(id) {
+  if(!confirm('이 책을 삭제할까요?')) return;
+  try { await removeBook(id); closeModal(); renderMyShelf(); showToast('삭제했어요'); } catch(e) { showToast('삭제 실패'); }
+}
+
+// ===== 우리반 =====
+function renderClassTab() {
+  const now=new Date();
+  const month=allBooks.filter(b=>b.month===now.getMonth()&&b.year===now.getFullYear());
+  document.getElementById('classMonthCount').textContent=month.length;
+  document.getElementById('classTotalCount').textContent=allBooks.length;
+  const counts={}; allBooks.forEach(b=>{if(!counts[b.title])counts[b.title]={...b,count:0};counts[b.title].count++;});
+  const popular=Object.values(counts).sort((a,b)=>b.count-a.count).slice(0,10);
+  document.getElementById('popularBooks').innerHTML=popular.length===0?'<p style="color:var(--text-muted);font-size:14px;padding:20px">아직 등록된 책이 없어요</p>'
+    :popular.map(b=>`<div class="popular-book" onclick="showBookDetail('${b.id}')">
+      ${b.thumbnail?`<img src="${b.thumbnail}">`:`<div style="width:100%;aspect-ratio:3/4;background:linear-gradient(135deg,#6BB5FF,#4A90D9);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px;color:white">📖</div>`}
+      <div class="pop-title">${b.title}</div><div class="pop-count">${b.count}명이 읽었어요</div></div>`).join('');
+  const sc={}; allBooks.forEach(b=>{const k=b.studentNumber;if(!sc[k])sc[k]={name:b.studentName,number:b.studentNumber,count:0};sc[k].count++;});
+  const top=Object.values(sc).sort((a,b)=>b.count-a.count).slice(0,3);
+  const medals=['🥇','🥈','🥉'],ranks=['rank-1','rank-2','rank-3'];
+  document.getElementById('topReaders').innerHTML=top.length===0?'<p style="color:var(--text-muted);font-size:14px;padding:20px">아직 등록된 책이 없어요</p>'
+    :top.map((r,i)=>`<div class="reader-rank"><div class="rank-badge ${ranks[i]}">${medals[i]}</div><div class="reader-name">${r.number}번 ${r.name}</div><div class="reader-count">${r.count}<span>권</span></div></div>`).join('');
+}
+
+// ===== 추천 =====
+async function searchForRecommend() {
+  const q=document.getElementById('recIsbnInput').value.trim();
+  if(!q){showToast('검색어를 입력해주세요');return;}
+  const book=await kakaoSearchFull(q);
+  if(book) {
+    currentBook=book; const ci=CATEGORY_MAP[book.category]||CATEGORY_MAP['기타'];
+    document.getElementById('recBookInfo').innerHTML=`${book.thumbnail?`<img class="book-cover" src="${book.thumbnail}">`:`<div class="book-cover-placeholder">📖</div>`}<div class="book-details"><h3>${book.title}</h3><div class="author">${book.author||''}</div><div class="publisher">${book.publisher||''}</div><span class="category-tag" style="background:${ci.color}15;color:${ci.color}">${ci.emoji} ${book.category}</span></div>`;
+    document.getElementById('recBookResult').style.display='block'; showToast('✅ 책을 찾았어요!');
+  } else showToast('책을 찾을 수 없어요 😢');
+}
+async function saveRecommendation() {
+  if(!currentBook) return;
+  const review=document.getElementById('recReviewInput').value.trim();
+  const now=new Date();
+  await addRecommendation({...currentBook,review,studentNumber:currentUser.number,studentName:currentUser.name,date:now.toISOString(),month:now.getMonth(),year:now.getFullYear()});
+  currentBook=null; document.getElementById('recIsbnInput').value=''; document.getElementById('recReviewInput').value='';
+  document.getElementById('recBookResult').style.display='none';
+  showToast('💝 추천 등록 완료!'); renderRecommendations();
+}
+function renderRecommendations() {
+  const now=new Date();
+  const recs=allRecs.filter(r=>r.month===now.getMonth()&&r.year===now.getFullYear());
+  const el=document.getElementById('recommendList');
+  el.innerHTML=recs.length===0?`<div style="text-align:center;padding:40px 20px;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:12px">💝</div><p>아직 추천된 책이 없어요</p></div>`
+    :recs.map(r=>`<div class="recommend-card"><div class="recommend-header">${r.thumbnail?`<img class="recommend-cover" src="${r.thumbnail}">`:`<div style="width:70px;height:95px;background:linear-gradient(135deg,#6BB5FF,#4A90D9);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;color:white;flex-shrink:0">📖</div>`}<div class="recommend-info"><h4>${r.title}</h4><div class="rec-author">${r.author||''}</div><div class="rec-by">${r.studentNumber}번 ${r.studentName}의 추천</div></div></div>${r.review?`<div class="recommend-text">"${r.review}"</div>`:''}</div>`).join('');
+}
+
+// ===== 선생님 =====
+function initTeacherMonthFilter() {
+  const months=['전체','1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const vals=[-1,0,1,2,3,4,5,6,7,8,9,10,11];
+  document.getElementById('teacherMonthFilter').innerHTML=months.map((m,i)=>`<button class="month-chip${teacherViewMonth===vals[i]?' active':''}" onclick="setTeacherMonth(${vals[i]})">${m}</button>`).join('');
+}
+function setTeacherMonth(m) { teacherViewMonth=m; initTeacherMonthFilter(); renderTeacherOverview(); }
+
+function renderTeacherOverview() {
+  const now=new Date();
+  const thisMonth=allBooks.filter(b=>b.month===now.getMonth()&&b.year===now.getFullYear());
+  // 월별 필터 적용된 데이터
+  const filteredBooks=teacherViewMonth===-1 ? allBooks : allBooks.filter(b=>b.month===teacherViewMonth);
+  document.getElementById('tClassMonth').textContent=filteredBooks.length;
+  document.getElementById('tClassTotal').textContent=allBooks.length;
+  // 이번달 전체 → 선택된 월 전체 로 라벨도 동적으로
+  const monthNames=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.querySelector('#tClassMonth').parentElement.querySelector('.stat-label').textContent=
+    teacherViewMonth===-1?'이번달 전체':monthNames[teacherViewMonth]+' 전체';
+  const activeAll=new Set(allBooks.map(b=>b.studentNumber)).size;
+  const activeFiltered=new Set(filteredBooks.map(b=>b.studentNumber)).size;
+  document.getElementById('tActiveStudents').textContent=activeFiltered;
+  document.getElementById('tAvgBooks').textContent=activeAll>0?(allBooks.length/activeAll).toFixed(1):'0';
+
+  const students={};
+  for(let i=1;i<=CLASS_SIZE;i++) {
+    const name=allStudents[i]; if(!name) continue;
+    const my=allBooks.filter(b=>b.studentNumber===i);
+    const mf=teacherViewMonth===-1?my:my.filter(b=>b.month===teacherViewMonth);
+    const mm=my.filter(b=>b.month===now.getMonth()&&b.year===now.getFullYear());
+    const ar=my.length>0?(my.reduce((s,b)=>s+b.rating,0)/my.length).toFixed(1):'-';
+    students[i]={number:i,name,monthCount:mm.length,totalCount:my.length,filteredCount:mf.length,avgRating:ar};
+  }
+  const sorted=Object.values(students).sort((a,b)=>a.number-b.number);
+  document.getElementById('studentTableBody').innerHTML=sorted.map(s=>`<tr><td class="num-cell">${s.number}</td><td>${s.name}</td><td class="num-cell">${teacherViewMonth===-1?s.monthCount:s.filteredCount}</td><td class="num-cell" style="font-weight:700;color:var(--primary)">${s.totalCount}</td><td class="num-cell">${s.avgRating==='-'?'-':'⭐'+s.avgRating}</td><td><button class="btn btn-sm btn-outline" style="padding:6px 10px;font-size:12px" onclick="showStudentDetail(${s.number})">상세</button></td></tr>`).join('');
+
+  // 분야 (위에서 선언한 filtered 재사용)
+  const cc={}; filteredBooks.forEach(b=>{const c=b.category||'기타';cc[c]=(cc[c]||0)+1;});
+  const cs=Object.entries(cc).sort((a,b)=>b[1]-a[1]);
+  const colors=['#EBF5FF','#FFF3E0','#E8F5E9','#FCE4EC','#F3E5F5','#E0F7FA','#FBE9E7','#ECEFF1','#F1F8E9','#FFF8E1'];
+  document.getElementById('classCategoryGrid').innerHTML=cs.length===0?'<p style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:20px">아직 데이터가 없어요</p>'
+    :cs.map(([cat,count],i)=>{const info=CATEGORY_MAP[cat]||CATEGORY_MAP['기타'];return`<div class="class-cat-card" style="background:${colors[i%colors.length]};cursor:pointer" onclick="showCategoryBooks('${cat}')"><div class="cat-emoji">${info.emoji}</div><div class="cat-name">${cat}</div><div class="cat-count" style="color:${info.color}">${count}권</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px">클릭하여 보기</div></div>`;}).join('');
+  document.getElementById('categoryBookList').innerHTML = '';
+}
+
+function showCategoryBooks(cat) {
+  const catFiltered=teacherViewMonth===-1 ? allBooks : allBooks.filter(b=>b.month===teacherViewMonth);
+  const books=catFiltered.filter(b=>(b.category||'기타')===cat).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const info=CATEGORY_MAP[cat]||CATEGORY_MAP['기타'];
+  const area=document.getElementById('categoryBookList');
+  area.innerHTML=`<div class="teacher-section" style="border-left:4px solid ${info.color}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin-bottom:0">${info.emoji} ${cat} (${books.length}권)</h3>
+      <button style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)" onclick="document.getElementById('categoryBookList').innerHTML=''">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px">
+      ${books.map(b=>`<div style="text-align:center;cursor:pointer" onclick="showBookDetail('${b.id}')">
+        ${b.thumbnail?`<img src="${b.thumbnail}" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:4px;box-shadow:1px 2px 6px rgba(0,0,0,0.1)">`:`<div style="width:100%;aspect-ratio:3/4;background:linear-gradient(135deg,#6BB5FF,#4A90D9);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;color:white">📖</div>`}
+        <div style="font-size:10px;font-weight:500;margin-top:3px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${b.title}</div>
+        <div style="font-size:9px;color:var(--text-muted)">${b.studentName}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+  area.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function showStudentDetail(num) {
+  const name=allStudents[num]||num+'번';
+  const books=allBooks.filter(b=>b.studentNumber===num);
+  if(!books.length){showToast(`${name} 학생의 독서 기록이 없어요`);return;}
+  const cc={}; books.forEach(b=>{const c=b.category||'기타';cc[c]=(cc[c]||0)+1;});
+  const cs=Object.entries(cc).sort((a,b)=>b[1]-a[1]);
+  const mx=cs[0]?.[1]||1;
+  const ar=(books.reduce((s,b)=>s+b.rating,0)/books.length).toFixed(1);
+  const area=document.getElementById('studentDetailArea');
+  area.innerHTML=`<div class="student-detail-card"><div class="student-detail-header"><h4>📋 ${num}번 ${name} 상세 분석</h4><button class="close-detail" onclick="document.getElementById('studentDetailArea').innerHTML=''">✕</button></div>
+    <div class="stats-grid" style="margin-bottom:20px"><div class="stat-card"><div class="stat-number teacher-color">${books.length}</div><div class="stat-label">총 읽은 책</div></div><div class="stat-card"><div class="stat-number accent">⭐${ar}</div><div class="stat-label">평균 별점</div></div></div>
+    <h4 style="font-size:15px;font-weight:700;margin-bottom:12px">📚 분야별 독서 현황</h4>
+    <div class="category-chart">${cs.map(([cat,count])=>{const info=CATEGORY_MAP[cat]||CATEGORY_MAP['기타'];const pct=Math.round((count/mx)*100);return`<div class="category-bar-item"><div class="category-bar-label"><span>${info.emoji} ${cat}</span><span>${count}권</span></div><div class="category-bar-bg"><div class="category-bar-fill" style="width:${pct}%;background:${info.color}"></div></div></div>`;}).join('')}</div>
+    <h4 style="font-size:15px;font-weight:700;margin:20px 0 12px">📖 읽은 책 목록</h4>
+    ${books.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(b=>`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;cursor:pointer" onclick="showBookDetail('${b.id}')">
+      ${b.thumbnail?`<img src="${b.thumbnail}" style="width:45px;height:63px;border-radius:4px;object-fit:cover">`:`<div style="width:45px;height:63px;background:var(--primary-light);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;color:white">📖</div>`}
+      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.title}</div><div style="font-size:12px;color:var(--text-light)">${new Date(b.date).toLocaleDateString('ko-KR')}</div></div>
+      <div style="font-size:12px;color:var(--star)">${'★'.repeat(b.rating)}</div></div>`).join('')}</div>`;
+  area.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function populateAnalysisSelect() {
+  const sel=document.getElementById('analysisStudentSelect');
+  const cur=sel.value; sel.innerHTML='<option value="">학생을 선택하세요</option>';
+  for(let i=1;i<=CLASS_SIZE;i++) { const name=allStudents[i]; if(name){const o=document.createElement('option');o.value=i;o.textContent=`${i}번 ${name}`;sel.appendChild(o);} }
+  if(cur) sel.value=cur;
+}
+
+function renderStudentAnalysis() {
+  const num=parseInt(document.getElementById('analysisStudentSelect').value);
+  if(!num){document.getElementById('analysisResult').innerHTML='';return;}
+  const name=allStudents[num]||num+'번';
+  const books=allBooks.filter(b=>b.studentNumber===num);
+  const area=document.getElementById('analysisResult');
+  if(!books.length){area.innerHTML=`<div class="teacher-section" style="text-align:center;padding:40px"><p style="color:var(--text-muted)">아직 독서 기록이 없어요</p></div>`;return;}
+
+  const cc={}; books.forEach(b=>{const c=b.category||'기타';cc[c]=(cc[c]||0)+1;});
+  const cs=Object.entries(cc).sort((a,b)=>b[1]-a[1]); const mx=cs[0]?.[1]||1;
+  const ar=(books.reduce((s,b)=>s+b.rating,0)/books.length).toFixed(1);
+  const md={}; books.forEach(b=>{md[b.month]=(md[b.month]||0)+1;});
+  const mn=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const mxm=Math.max(...Object.values(md),1);
+  const topCat=cs[0]?.[0]||'없음';
+  const allCats=Object.keys(CATEGORY_MAP).filter(c=>c!=='기타');
+  const missing=allCats.filter(c=>!cc[c]);
+
+  area.innerHTML=`
+    <div class="teacher-section"><h3>📊 ${num}번 ${name} 독서 리포트</h3>
+      <div class="stats-grid" style="margin-bottom:20px">
+        <div class="stat-card"><div class="stat-number teacher-color">${books.length}</div><div class="stat-label">총 읽은 책</div></div>
+        <div class="stat-card"><div class="stat-number accent">⭐${ar}</div><div class="stat-label">평균 별점</div></div>
+        <div class="stat-card"><div class="stat-number">${cs.length}</div><div class="stat-label">읽은 분야 수</div></div>
+        <div class="stat-card"><div class="stat-number accent">${topCat}</div><div class="stat-label">최다 분야</div></div>
+      </div></div>
+    <div class="teacher-section"><h3>📚 분야별 독서 현황</h3>
+      <div class="category-chart">${cs.map(([cat,count])=>{const info=CATEGORY_MAP[cat]||CATEGORY_MAP['기타'];const pct=Math.round((count/mx)*100);return`<div class="category-bar-item"><div class="category-bar-label"><span>${info.emoji} ${cat}</span><span>${count}권 (${Math.round(count/books.length*100)}%)</span></div><div class="category-bar-bg"><div class="category-bar-fill" style="width:${pct}%;background:${info.color}"></div></div></div>`;}).join('')}</div>
+      ${missing.length>0?`<div style="margin-top:16px;padding:12px;background:#FFF3E0;border-radius:8px;font-size:13px;color:#E65100">💡 아직 읽지 않은 분야: ${missing.map(c=>(CATEGORY_MAP[c]?.emoji||'')+' '+c).join(', ')}</div>`:''}</div>
+    <div class="teacher-section"><h3>📈 월별 독서량</h3>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:120px;padding:10px 0">
+        ${[0,1,2,3,4,5,6,7,8,9,10,11].map(m=>{const c=md[m]||0;const h=mxm>0?Math.max((c/mxm)*100,c>0?8:2):2;return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:11px;font-weight:700;color:${c>0?'var(--teacher)':'var(--text-muted)'}">${c||''}</span><div style="width:100%;height:${h}px;background:${c>0?'var(--teacher)':'#EEE'};border-radius:4px 4px 0 0"></div><span style="font-size:10px;color:var(--text-muted)">${mn[m]}</span></div>`;}).join('')}
+      </div></div>
+    <div class="teacher-section"><h3>📖 전체 독서 목록</h3>
+      ${books.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(b=>{const ci=CATEGORY_MAP[b.category]||CATEGORY_MAP['기타'];return`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;cursor:pointer" onclick="showBookDetail('${b.id}')">
+        ${b.thumbnail?`<img src="${b.thumbnail}" style="width:45px;height:63px;border-radius:4px;object-fit:cover">`:`<div style="width:45px;height:63px;background:var(--primary-light);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;color:white">📖</div>`}
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.title}</div><div style="font-size:12px;color:var(--text-light)">${b.author||''} · ${new Date(b.date).toLocaleDateString('ko-KR')}</div><span style="font-size:11px;padding:1px 6px;background:${ci.color}15;color:${ci.color};border-radius:8px">${ci.emoji} ${b.category||'기타'}</span></div>
+        <div style="font-size:12px;color:var(--star)">${'★'.repeat(b.rating)}</div></div>`;}).join('')}</div>`;
+}
+
+// ===== CSV =====
+function exportCSV() {
+  let csv='\uFEFF번호,이름,책제목,저자,분야,별점,한줄평,날짜\n';
+  allBooks.sort((a,b)=>a.studentNumber-b.studentNumber||new Date(a.date)-new Date(b.date)).forEach(b=>{
+    csv+=`${b.studentNumber},"${b.studentName}","${(b.title||'').replace(/"/g,'""')}","${(b.author||'').replace(/"/g,'""')}","${b.category||'기타'}",${b.rating},"${(b.review||'').replace(/"/g,'""')}",${new Date(b.date).toLocaleDateString('ko-KR')}\n`;
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`독서기록_${new Date().toLocaleDateString('ko-KR')}.csv`; a.click();
+  showToast('📥 CSV 파일 다운로드!');
+}
+
+// ===== 설정 =====
+async function changePassword() {
+  const pw=document.getElementById('newPw').value;
+  if(!pw||pw.length<2){showToast('비밀번호를 입력해주세요');return;}
+  await setTeacherPw(pw); document.getElementById('newPw').value='';
+  showToast('✅ 비밀번호가 변경되었어요');
+}
+async function resetAllData() {
+  if(!confirm('정말 전체 데이터를 초기화할까요?\n이 작업은 되돌릴 수 없어요!')) return;
+  if(!confirm('한 번 더 확인합니다. 모든 독서 기록과 학생 목록이 삭제됩니다.')) return;
+  showToast('🗑 삭제 중...');
+  try {
+    const batch1=allBooks.map(b=>db.collection('books').doc(b.id).delete());
+    const batch2=allRecs.map(r=>db.collection('recommendations').doc(r.id).delete());
+    // 학생 목록도 삭제
+    const studentsSnap=await db.collection('students').get();
+    const batch3=studentsSnap.docs.map(d=>db.collection('students').doc(d.id).delete());
+    await Promise.all([...batch1,...batch2,...batch3]);
+    allBooks=[]; allRecs=[]; allStudents=[];
+    showToast('✅ 초기화 완료'); renderTeacherOverview();
+  } catch(e) { showToast('초기화 실패'); console.error(e); }
+}
+
+document.getElementById('bookModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+
+// 5초 후 무조건 로딩 해제 (어떤 오류가 있어도)
+setTimeout(function() {
+  var ov = document.getElementById('loadingOverlay');
+  if (ov && !ov.classList.contains('hidden')) {
+    ov.classList.add('hidden');
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+}, 5000);
+
+init();
+</script>
+</body>
+</html>
